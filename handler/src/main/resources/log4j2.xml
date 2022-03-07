@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="warn" packages="com.amazonaws.services.lambda.runtime.log4j2" >
+	<Properties>
+		<!-- This property value is used as the default in case the environment 
+			variable, ${env:APP_LOG_PATH}, used below is not set -->
+		<Property name="APP_LOG_PATH">${env:USERPROFILE}/crisp_logs</Property>
+	</Properties>
+	<Appenders>
+		<Console name="Application-Appender" target="SYSTEM_OUT">
+			<PatternLayout>
+				<pattern>
+					%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5p %C:%M(%L) - %m%n
+				</pattern>
+			</PatternLayout>
+		</Console>
+		<Lambda name="Lambda">
+			<PatternLayout>
+				<pattern> [%-5p] %X{AWSRequestId}  %c{1} %enc{%m}{CRLF} %n
+				</pattern>
+			</PatternLayout>
+		</Lambda>
+	</Appenders>
+	<Loggers>
+		    <Root level="error">
+      <AppenderRef ref="Lambda"/>
+    </Root>
+    <Logger name="software.amazon.awssdk" level="warn" />
+    <Logger name="software.amazon.awssdk.request" level="info" />
+    <Logger name="org.codewhiteboard.lambda.handlers.BasicHandler" level="info" additivity="false">
+			<AppenderRef ref="Lambda" />
+		</Logger>
+	</Loggers>
+</Configuration>
