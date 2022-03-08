@@ -21,7 +21,7 @@
 		</Lambda>
 	</Appenders>
 	<Loggers>
-		    <Root level="error">
+		    <Root level="info">
       <AppenderRef ref="Lambda"/>
     </Root>
     <Logger name="software.amazon.awssdk" level="warn" />

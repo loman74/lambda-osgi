@@ -32,7 +32,7 @@ public class PlugIns {
 
 	private static Framework framework;
 	private static BundleContext bndlContext;
-	private static Set<Bundle> bundles = new HashSet<Bundle>();
+	private static Map<String,Bundle> bundlesMap = new HashMap<String,Bundle>();
 	
 	//handles to each plugin bundle
 	private static Bundle s3DownloaderPlugin;
@@ -126,7 +126,9 @@ public class PlugIns {
 			File bundleFile = new File(fileName);
 				url = bundleFile.toURI().toURL();
 			try {
-				bundles.add(bndlContext.installBundle(url.toString()));
+				Bundle bndl = bndlContext.installBundle(url.toString());
+				bundlesMap.put(bndl.getSymbolicName(), bndl);
+				
 				logger.debug("Installed bundle " + url.toString());
 			} catch (BundleException be) {
 				//bundle set cannot have duplicates, but in case
@@ -138,12 +140,12 @@ public class PlugIns {
 			
 			
 		}
-		logger.info("Installed bundles count:" + bundles.size());
+		logger.info("Installed bundles count:" + bundlesMap.size());
 	}
 	
 	private static void startAllBundles() throws BundleException {
 		
-		for (Bundle bundle : bundles) {
+		for (Bundle bundle : bundlesMap.values()) {
 			if (bundle.getHeaders().get(Constants.FRAGMENT_HOST) == null) {
 				bundle.start();
 				logger.debug("Started bundle " + bundle.getSymbolicName() + ", state:" + bundle.getState());
@@ -153,15 +155,8 @@ public class PlugIns {
 	
 	public static Object downLoad(String artifactPath, String destFolder, String requestId) throws Exception {
 		
-		//discover s3 downloader bundle
-		for (Bundle bundle : bundles) {
-			String bndlSymName = bundle.getHeaders().get(Constants.BUNDLE_SYMBOLICNAME) ;
-			if (bndlSymName != null && bndlSymName.equals("org.codewhiteboard.osgi-plugin-s3downloader")) {				
-				s3DownloaderPlugin = bundle;
-				logger.info("found " + bundle.getSymbolicName() + ", state:" + bundle.getState());
-			}
-		}
-		
+		//get the s3 downloader bundle		
+		s3DownloaderPlugin = bundlesMap.get("org.codewhiteboard.osgi-plugin-s3downloader");
 		if(s3DownloaderPlugin == null) throw new RuntimeException("S3 download plugin not found, exiting..");
 		
 		Class<?> mainclass = s3DownloaderPlugin.loadClass("org.codewhiteboard.lambda.plugins.s3.Downloader");
