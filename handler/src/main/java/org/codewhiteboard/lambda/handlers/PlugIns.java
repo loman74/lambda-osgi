@@ -34,15 +34,13 @@ public class PlugIns {
 	private static BundleContext bndlContext;
 	private static Map<String,Bundle> bundlesMap = new HashMap<String,Bundle>();
 	
-	//handles to each plugin bundle
-	private static Bundle s3DownloaderPlugin;
-	
 	private static final Logger logger = LoggerFactory.getLogger(PlugIns.class);
 	
-	public static void initialize() throws Exception {
+	public static void bootStrap() throws Exception {
 		
 		
-		//initialize embedded OSGi 
+		try {
+		//create embedded OSGi 
 		FrameworkFactory frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();
 		Map<String, String> config = new HashMap<>();
 		String tmpDir = System.getProperty("java.io.tmpdir");
@@ -52,7 +50,8 @@ public class PlugIns {
 		 * be resolved to the one on the host.
 		 */
 
-		final StringBuilder sb = new StringBuilder(128);
+		//use the host logging service
+ 		final StringBuilder sb = new StringBuilder(128);
 		sb.append("org.slf4j; version=1.8.0.beta4");
 		sb.append(",");
 		sb.append("org.slf4j.*; version=1.8.0.beta4");
@@ -73,8 +72,16 @@ public class PlugIns {
 		
 		//start all plugin bundles. This step resolves imports and exports among dependencies
 		startAllBundles();
+		}catch(Exception e) {
+			logger.error("Failed to initialize PlugIns " + e);
+			throw e;
+		}
 
 
+	}
+	
+	public static Bundle getBundle(String bundleSymName) {
+		return bundlesMap.get(bundleSymName);
 	}
 	
 	private static List<String> getAllBundles() throws IOException{
@@ -152,19 +159,7 @@ public class PlugIns {
 			}
 		}
 	}
-	
-	public static Object downLoad(String artifactPath, String destFolder) throws Exception {
 		
-		//get the s3 downloader bundle		
-		s3DownloaderPlugin = bundlesMap.get("org.codewhiteboard.osgi-plugin-s3downloader");
-		if(s3DownloaderPlugin == null) throw new RuntimeException("S3 download plugin not found, exiting..");
-		
-		Class<?> mainclass = s3DownloaderPlugin.loadClass("org.codewhiteboard.lambda.plugins.s3.Downloader");
-		Method method = mainclass.getMethod("downLoad", new Class [] {String.class,String.class});
-		return method.invoke(null, artifactPath, destFolder);
-
-	}
-	
 	public static void stop() {
 		
 		try {

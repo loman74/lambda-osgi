@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
@@ -30,7 +32,7 @@ public class Downloader implements BundleActivator  {
 	/* Download fileName from s3 bucket and key. Save it to "tmp" folder 
 	 * 
 	 */
-	public static File downLoad(String jarPath, String destFolder) {
+	public static File downLoad(String jarPath, String destFolder) throws IOException {
 	
 		String bucket = jarPath.split("/", 4)[2];
 		String key = jarPath.split("/", 4)[3];
@@ -42,17 +44,23 @@ public class Downloader implements BundleActivator  {
 		
         String tmpDir = System.getProperty("java.io.tmpdir");
         File downloadedFile = new File(tmpDir + File.separator + destFolder + File.separator + fileName);
+//        File downloadedFileChkSum = new File(tmpDir + File.separator + destFolder + File.separator + fileName + ".checksum");
         
         if (downloadedFile.exists()) {
-        	logger.info(" Found previously downloaded " + fileName + " from bucket " + bucket);
+//        	String checksum = new String(Files.readAllBytes(downloadedFileChkSum.toPath()));
+        	logger.info("Found previously downloaded " + fileName);
+//        	logger.info("Previous checksum=" + checksum);
         	return downloadedFile;
         }
         
 		try {
 			S3Object o = s3.getObject(bucket, key);
 			S3ObjectInputStream s3is = o.getObjectContent();
+//			String checksum = o.getObjectMetadata().getETag();
+//			logger.info("Checksum of download file =" + checksum);
 			
 			FileOutputStream fos = new FileOutputStream(downloadedFile);
+//			FileOutputStream fosChksum = new FileOutputStream(downloadedFileChkSum);
 			byte[] read_buf = new byte[1024];
 			int read_len = 0;
 			while ((read_len = s3is.read(read_buf)) > 0) {
@@ -60,6 +68,10 @@ public class Downloader implements BundleActivator  {
 			}
 			s3is.close();
 			fos.close();
+			
+//			fosChksum.write(checksum.getBytes(StandardCharsets.UTF_8));
+//			fosChksum.close();
+			
 		} catch (AmazonServiceException e) {
 			System.out.println("Error " + e);
 			throw new RuntimeException(e);
@@ -70,6 +82,8 @@ public class Downloader implements BundleActivator  {
 			System.out.println("Error " + e);
 			throw new RuntimeException(e);
 		}
+		
+		
 
 		logger.info("download completed");
 		return downloadedFile;

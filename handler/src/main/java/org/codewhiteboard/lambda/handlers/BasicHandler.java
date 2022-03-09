@@ -28,6 +28,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.config.Configurator;
+import org.osgi.framework.Bundle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,141 +36,139 @@ public class BasicHandler implements RequestHandler<Map<String, String>, String>
 
 	private static final Logger logger = LoggerFactory.getLogger(BasicHandler.class);
 	Gson gson = new GsonBuilder().setPrettyPrinting().create();
-	
+
 	private static final String CACHELOC = System.getProperty("java.io.tmpdir") + File.separator + "OSGI";
 
 	@Override
 	public String handleRequest(Map<String, String> event, Context context) {
 
-
 		String requestId = context.getAwsRequestId();
 		String logGroupName = context.getLogGroupName();
 		String logStreamName = context.getLogStreamName();
-		
+
+		int exitCode = 999;
+		String response = "Exit code: " + exitCode + ", Log Group Name: " + logGroupName + ", Log Stream Name: "
+				+ logStreamName + ", RequestId: " + requestId;
+
 		// reset logging to baseline. Logging configuration persists after
 		// invocation.
 		Configurator.reconfigure();
 		String dbgClassName = null;
 		if (event.containsKey("log_debug") && event.get("log_debug") != null) {
 			dbgClassName = event.get("log_debug").trim();
-			configureLogging(dbgClassName,null);
+			configureLogging(dbgClassName, null);
 		}
 
 		File tmpFolder = new File(System.getProperty("java.io.tmpdir"));
-
 
 		logger.info("Used storage space of " + tmpFolder.toString() + " folder is "
 				+ folderSize(tmpFolder.toPath()) / (1024 * 1024) + " MB");
 
 		try {
-			PlugIns.initialize();
-		} catch (Exception e) {
-			logger.error("Failed to initialize PlugIns " + e);
-			reclaimStorage(CACHELOC);
-			throw new RuntimeException(e);
-		}
+			PlugIns.bootStrap();
 
-		logger.debug("Used storage space of " + tmpFolder.toString() + " folder is "
-				+ folderSize(tmpFolder.toPath()) / (1024 * 1024) + " MB");
-		// log execution details
-		logger.debug("ENVIRONMENT VARIABLES: " + gson.toJson(System.getenv()));
-		logger.debug("CONTEXT: " + gson.toJson(context));
-		
+			logger.debug("Used storage space of " + tmpFolder.toString() + " folder is "
+					+ folderSize(tmpFolder.toPath()) / (1024 * 1024) + " MB");
+			// log execution details
+			logger.debug("ENVIRONMENT VARIABLES: " + gson.toJson(System.getenv()));
+			logger.debug("CONTEXT: " + gson.toJson(context));
 
-		// process event
-		logger.info("EVENT: " + gson.toJson(event));
+			// process event
+			logger.info("EVENT: " + gson.toJson(event));
 
-		String appJarPath = null;
-		if (event.containsKey("jar") && event.get("jar") != null) {
-			appJarPath = event.get("jar");
-		} else {
-			logger.error("Mandatory jar field is missing or null, exiting...");
-			reclaimStorage(CACHELOC);
-			throw new RuntimeException("Mandatory jar field is missing or null, exiting...");
-		}
-
-
-
-		File file = null;
-		if (appJarPath.startsWith("s3://") || appJarPath.startsWith("S3://")) {
-			//download all files in a separate folder called osgi, for easy clean up later
-			String destFolderName = "osgi";
-			try {
-				file = (File)PlugIns.downLoad(appJarPath, destFolderName);
-			} catch (Exception e) {
-				logger.error("App jar download failed, exiting...{}", e.getMessage());
-				reclaimStorage(CACHELOC);
-				throw new RuntimeException(e);
+			String appJarPath = null;
+			if (event.containsKey("jar") && event.get("jar") != null) {
+				appJarPath = event.get("jar");
+			} else {
+				logger.error("Mandatory jar field is missing or null, exiting...");
+				throw new RuntimeException("Mandatory jar field is missing or null, exiting...");
 			}
 
-		} else {
-			//app jar may be sourced within the container
-			file = new File(appJarPath);
-		}
+			File file = null;
+			if (appJarPath.startsWith("s3://") || appJarPath.startsWith("S3://")) {
+				// download all files in a separate folder called osgi, for easy clean up later
+				String destFolderName = "osgi";
+				file = (File) downLoad(appJarPath, destFolderName);
 
-		logger.info("App jar: " + file.getAbsolutePath());
-		logger.debug("App jar file is readable : " + file.canRead());
-		logger.info("App jar size: " + file.length() / (1024 * 1024) + " MB");
-		logger.info("App jar download time: " + new Date(file.lastModified()).toString());
+			} else {
+				// app jar may be sourced within the container
+				file = new File(appJarPath);
+			}
 
-		logger.debug("Used storage space of " + tmpFolder.toString() + " folder is "
-				+ folderSize(tmpFolder.toPath()) / (1024 * 1024) + " MB");
+			logger.info("App jar: " + file.getAbsolutePath());
+			logger.debug("App jar file is readable : " + file.canRead());
+			logger.info("App jar size: " + file.length() / (1024 * 1024) + " MB");
+			logger.info("App jar download time: " + new Date(file.lastModified()).toString());
 
-		if (!file.exists() || (file.exists() && file.length() == 0)) {
-			logger.error("Unable to download App Jar from s3 or find it in container");
-			reclaimStorage(CACHELOC);
-			throw new RuntimeException("Unable to download App Jar from s3 or find it in container");
-		}
+			logger.debug("Used storage space of " + tmpFolder.toString() + " folder is "
+					+ folderSize(tmpFolder.toPath()) / (1024 * 1024) + " MB");
 
+			if (!file.exists() || (file.exists() && file.length() == 0)) {
+				logger.error("Unable to download App Jar from s3 or find it in container");
+				throw new RuntimeException("Unable to download App Jar from s3 or find it in container");
+			}
 
+			logger.info("Executing App jar..");
 
-		logger.info("Executing App jar..");
-		
-		String className = null;
-		if (event.containsKey("class") && event.get("class") != null)
-			className = event.get("class").trim();
-		String methodName = "main"; // convention over configuration. But for dm client, it must be mainProxy
-		if (event.containsKey("method") && event.get("method") != null)
-			methodName = event.get("method").trim();
-		String[] args = null;
-		if (event.containsKey("command_line") && event.get("command_line") != null)
-			args = translateCommandline(event.get("command_line").trim());
-		logger.info("Translated arguments: " + Arrays.toString(args));
+			String className = null;
+			if (event.containsKey("class") && event.get("class") != null)
+				className = event.get("class").trim();
+			String methodName = "main"; // convention over configuration. But for dm client, it must be mainProxy
+			if (event.containsKey("method") && event.get("method") != null)
+				methodName = event.get("method").trim();
+			String[] args = null;
+			if (event.containsKey("command_line") && event.get("command_line") != null)
+				args = translateCommandline(event.get("command_line").trim());
+			logger.info("Translated arguments: " + Arrays.toString(args));
 
-
-		int exitCode = 999;
-		try {
 			exitCode = runAppJar(file, className, methodName, args, dbgClassName);
+
+			logger.info("App Jar execution complete");
+			logger.debug("Used storage space of " + tmpFolder.toString() + " folder is "
+					+ folderSize(tmpFolder.toPath()) / (1024 * 1024) + " MB");
+
+			response = "Exit code: " + exitCode + ", Log Group Name: " + logGroupName + ", Log Stream Name: "
+					+ logStreamName + ", RequestId: " + requestId;
+
+			if (exitCode != 0) {
+				throw new RuntimeException("Error running Jams job: " + response);
+			}
+
 		} catch (Exception e) {
 			reclaimStorage(CACHELOC);
 			throw new RuntimeException(e);
 		}
-
-		logger.info("App Jar execution complete");
-		logger.debug("Used storage space of " + tmpFolder.toString() + " folder is "
-				+ folderSize(tmpFolder.toPath()) / (1024 * 1024) + " MB");
-
-		String response = "Exit code: " + exitCode + ", Log Group Name: " + logGroupName + ", Log Stream Name: "
-				+ logStreamName + ", RequestId: " + requestId;
-		if (exitCode != 0) {
-			reclaimStorage(CACHELOC);
-			throw new RuntimeException("Error running Jams job: " + response);
-		}
-
-		
 
 		logger.debug("Used storage space of " + tmpFolder.toString() + " folder is "
 				+ folderSize(tmpFolder.toPath()) / (1024 * 1024) + " MB");
 
 		return response;
 	}
-	
-	private Integer runAppJar(File jar, String className, String methodName, String[] args, String dbgClassName) throws Exception  {
-		
-		
+
+	public static Object downLoad(String artifactPath, String destFolder) throws Exception {
+
+		try {
+			// get the s3 downloader bundle
+			Bundle s3DownloaderPlugin = PlugIns.getBundle("org.codewhiteboard.osgi-plugin-s3downloader");
+			if (s3DownloaderPlugin == null)
+				throw new RuntimeException("S3 download plugin not found, exiting..");
+
+			Class<?> mainclass = s3DownloaderPlugin.loadClass("org.codewhiteboard.lambda.plugins.s3.Downloader");
+			Method method = mainclass.getMethod("downLoad", new Class[] { String.class, String.class });
+			return method.invoke(null, artifactPath, destFolder);
+		} catch (Exception e) {
+			logger.error("App jar download failed, exiting...{}", e.getMessage());
+			throw e;
+		}
+
+	}
+
+	private Integer runAppJar(File jar, String className, String methodName, String[] args, String dbgClassName)
+			throws Exception {
+
 		Integer exitCode = 999;
 		URL url = jar.toURI().toURL();
-		
+
 		URLClassLoader appLoader = new URLClassLoader(new URL[] { url }, this.getClass().getClassLoader());
 
 		Class classToLoad;
@@ -186,9 +185,9 @@ public class BasicHandler implements RequestHandler<Map<String, String>, String>
 				}
 			throw e;
 		}
-			// set log level to debug for given Application class
+		// set log level to debug for given Application class
 		if (dbgClassName != null) {
-			configureLogging(dbgClassName,appLoader);
+			configureLogging(dbgClassName, appLoader);
 		}
 		Method method;
 		try {
@@ -214,29 +213,28 @@ public class BasicHandler implements RequestHandler<Map<String, String>, String>
 				}
 			throw e;
 		}
-		
-		
+
 		return (Integer) result;
 
 	}
-	
-	private static void configureLogging(String className, ClassLoader cl) {
-		
-			if ("root".equals(className)) {
-				logger.info("setting log level to debug for root");
-				Configurator.setAllLevels(LogManager.getRootLogger().getName(), Level.DEBUG);
-			} else {
-				logger.info("setting log level to debug for class: " + className);
-				Class targetClass = null;
-				try {
-					targetClass = Class.forName(className, true, cl);
-					Configurator.setLevel(LogManager.getLogger(targetClass).getName(), Level.DEBUG);
-				} catch (ClassNotFoundException e) {
-					logger.info("class " + className + " does not exist");
 
-				}
+	private static void configureLogging(String className, ClassLoader cl) {
+
+		if ("root".equals(className)) {
+			logger.info("setting log level to debug for root");
+			Configurator.setAllLevels(LogManager.getRootLogger().getName(), Level.DEBUG);
+		} else {
+			logger.info("setting log level to debug for class: " + className);
+			Class targetClass = null;
+			try {
+				targetClass = Class.forName(className, true, cl);
+				Configurator.setLevel(LogManager.getLogger(targetClass).getName(), Level.DEBUG);
+			} catch (ClassNotFoundException e) {
+				logger.info("class " + className + " does not exist");
 
 			}
+
+		}
 	}
 
 	private static void reclaimStorage(String cacheLocation) {
@@ -244,7 +242,7 @@ public class BasicHandler implements RequestHandler<Map<String, String>, String>
 		PlugIns.stop();
 		try {
 			logger.info("reclaiming storage for subsequent invocations");
-//			FileUtils.cleanDirectory(new File(cacheLocation));
+			FileUtils.cleanDirectory(new File(cacheLocation));
 		} catch (Exception e) {
 			logger.error("exception while reclaiming storage, silencing...");
 		}
