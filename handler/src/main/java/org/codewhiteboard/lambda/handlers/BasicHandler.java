@@ -95,7 +95,7 @@ public class BasicHandler implements RequestHandler<Map<String, String>, String>
 			//download all files in a separate folder called osgi, for easy clean up later
 			String destFolderName = "osgi";
 			try {
-				file = (File)PlugIns.downLoad(appJarPath, destFolderName, requestId);
+				file = (File)PlugIns.downLoad(appJarPath, destFolderName);
 			} catch (Exception e) {
 				logger.error("App jar download failed, exiting...{}", e.getMessage());
 				reclaimStorage(CACHELOC);
@@ -244,7 +244,7 @@ public class BasicHandler implements RequestHandler<Map<String, String>, String>
 		PlugIns.stop();
 		try {
 			logger.info("reclaiming storage for subsequent invocations");
-			FileUtils.cleanDirectory(new File(cacheLocation));
+//			FileUtils.cleanDirectory(new File(cacheLocation));
 		} catch (Exception e) {
 			logger.error("exception while reclaiming storage, silencing...");
 		}

@@ -153,7 +153,7 @@ public class PlugIns {
 		}
 	}
 	
-	public static Object downLoad(String artifactPath, String destFolder, String requestId) throws Exception {
+	public static Object downLoad(String artifactPath, String destFolder) throws Exception {
 		
 		//get the s3 downloader bundle		
 		s3DownloaderPlugin = bundlesMap.get("org.codewhiteboard.osgi-plugin-s3downloader");

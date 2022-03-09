@@ -43,6 +43,11 @@ public class Downloader implements BundleActivator  {
         String tmpDir = System.getProperty("java.io.tmpdir");
         File downloadedFile = new File(tmpDir + File.separator + destFolder + File.separator + fileName);
         
+        if (downloadedFile.exists()) {
+        	logger.info(" Found previously downloaded " + fileName + " from bucket " + bucket);
+        	return downloadedFile;
+        }
+        
 		try {
 			S3Object o = s3.getObject(bucket, key);
 			S3ObjectInputStream s3is = o.getObjectContent();
