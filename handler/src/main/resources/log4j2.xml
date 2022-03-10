@@ -29,5 +29,8 @@
     <Logger name="org.codewhiteboard.lambda.handlers.BasicHandler" level="info" additivity="false">
 			<AppenderRef ref="Lambda" />
 		</Logger>
+	<Logger name="org.finra.crisp.vdiff.comparators.DataCompareImpl" level="info" additivity="false" >
+	<AppenderRef ref="Lambda" />
+		</Logger>
 	</Loggers>
 </Configuration>

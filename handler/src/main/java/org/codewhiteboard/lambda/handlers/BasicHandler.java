@@ -59,14 +59,16 @@ public class BasicHandler implements RequestHandler<Map<String, String>, String>
 			configureLogging(dbgClassName, null);
 		}
 
-		File tmpFolder = new File(System.getProperty("java.io.tmpdir"));
+		String tmpDir = System.getProperty("java.io.tmpdir");
+		File tmpFolder = new File(tmpDir);
+		File osgi = new File(tmpDir + File.separator + "osgi");
 
 		logger.info("Used storage space of " + tmpFolder.toString() + " folder is "
 				+ folderSize(tmpFolder.toPath()) / (1024 * 1024) + " MB");
 
 		try {
 			PlugIns.bootStrap();
-
+			
 			logger.debug("Used storage space of " + tmpFolder.toString() + " folder is "
 					+ folderSize(tmpFolder.toPath()) / (1024 * 1024) + " MB");
 			// log execution details
@@ -141,7 +143,7 @@ public class BasicHandler implements RequestHandler<Map<String, String>, String>
 
 		logger.debug("Used storage space of " + tmpFolder.toString() + " folder is "
 				+ folderSize(tmpFolder.toPath()) / (1024 * 1024) + " MB");
-
+		
 		return response;
 	}
 
@@ -230,7 +232,7 @@ public class BasicHandler implements RequestHandler<Map<String, String>, String>
 				targetClass = Class.forName(className, true, cl);
 				Configurator.setLevel(LogManager.getLogger(targetClass).getName(), Level.DEBUG);
 			} catch (ClassNotFoundException e) {
-				logger.info("class " + className + " does not exist");
+				logger.info("class " + className + " cannot be found");
 
 			}
 
