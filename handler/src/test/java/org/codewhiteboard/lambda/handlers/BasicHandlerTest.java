@@ -22,10 +22,10 @@ public class BasicHandlerTest {
     public void createInput() throws IOException {
         // set up your sample input object here.
         input = new HashMap<String,String>();
-        input.put("jar", "s3://4652-5751-2377-application-dev-staging/CRISP/crisp-dm-client/crisp-dm-client-0.0.1-SNAPSHOT-DM.jar");
-        input.put("class" , "org.finra.crisp.CrispDMClient");
+        input.put("jar", "s3://xxxxxxx/xx.jar");
+        input.put("class" , "org.xx.xx.xx");
         input.put("method","mainProxy");
-        input.put("command_line" , "get_data -e dev -k stats_dt -n crisp -o replication_slots_hs -p 2021-10-31 -t txt -u devintenvironment ");
+        input.put("command_line" , "arg 1 arg2 arg3");
         input.put("log_debug" , "");
         
     }
