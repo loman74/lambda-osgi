@@ -6,7 +6,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.attribute.BasicFileAttributes;
 
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
@@ -49,8 +48,7 @@ public class Downloader implements BundleActivator  {
         
         if (downloadedFile.exists()) {
 //        	String checksum = new String(Files.readAllBytes(downloadedFileChkSum.toPath()));
-        	BasicFileAttributes attr = Files.readAttributes(downloadedFile.toPath(), BasicFileAttributes.class);
-        	logger.info("Found previously downloaded {} created: {} lastmodified: {} lastaccessed: {}", fileName, attr.creationTime(), attr.lastModifiedTime(), attr.lastAccessTime() );
+        	logger.info("Found previously downloaded " + fileName);
 //        	logger.info("Previous checksum=" + checksum);
         	return downloadedFile;
         }
@@ -58,12 +56,11 @@ public class Downloader implements BundleActivator  {
 		try {
 			S3Object o = s3.getObject(bucket, key);
 			S3ObjectInputStream s3is = o.getObjectContent();
-//			
-			String version = o.getObjectMetadata().getVersionId();
-			logger.info("Version of download file =" + version);
+//			String checksum = o.getObjectMetadata().getETag();
+//			logger.info("Checksum of download file =" + checksum);
 			
 			FileOutputStream fos = new FileOutputStream(downloadedFile);
-			FileOutputStream fosChksum = new FileOutputStream(version);
+//			FileOutputStream fosChksum = new FileOutputStream(downloadedFileChkSum);
 			byte[] read_buf = new byte[1024];
 			int read_len = 0;
 			while ((read_len = s3is.read(read_buf)) > 0) {
@@ -72,8 +69,8 @@ public class Downloader implements BundleActivator  {
 			s3is.close();
 			fos.close();
 			
-			fosChksum.write(version.getBytes(StandardCharsets.UTF_8));
-			fosChksum.close();
+//			fosChksum.write(checksum.getBytes(StandardCharsets.UTF_8));
+//			fosChksum.close();
 			
 		} catch (AmazonServiceException e) {
 			System.out.println("Error " + e);
